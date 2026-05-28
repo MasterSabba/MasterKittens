@@ -11,6 +11,7 @@
             --table-bg: radial-gradient(circle at center, #1b5e20, #0a3d0a);
             --card-w: 100px;
             --card-h: 150px;
+            --text-color: white;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -18,11 +19,30 @@
         body {
             font-family: 'Nunito', sans-serif;
             background: var(--table-bg);
-            color: white;
+            color: var(--text-color);
             height: 100vh;
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            position: relative;
+        }
+
+        /* STILE PULSANTE EXIT GRIGIO SCURO INTEGRATO */
+        .exit-button {
+            position: absolute;
+            top: 10px;
+            left: 15px;
+            font-size: 2rem;
+            line-height: 1;
+            color: #333; /* Grigio scuro discreto */
+            text-decoration: none;
+            z-index: 2001;
+            transition: all 0.2s ease;
+            font-family: Arial, sans-serif;
+        }
+        .exit-button:hover {
+            color: var(--text-color); /* Si illumina al passaggio */
+            transform: scale(1.1);
         }
 
         /* Top Bar */
@@ -142,9 +162,16 @@
         .future-cards-container { display: flex; gap: 10px; justify-content: center; margin: 20px 0; }
         .future-cards-container .card { transform: scale(0.9); cursor: default; }
         .future-cards-container .card:hover { transform: scale(0.9); box-shadow: none; }
+
+        /* Adattamento Layout Responsive per la X in alto */
+        @media (max-width: 600px) {
+            #stats-bar { padding-left: 50px; } /* Evita che il testo si sovrapponga alla X */
+        }
     </style>
 </head>
 <body>
+
+    <a href="https://mastersabba.github.io/MasterSabba/" class="exit-button" title="Torna all'Hub">×</a>
 
     <div id="stats-bar">
         <div>🏆 Vittorie: <span id="wins">0</span></div>
@@ -207,10 +234,9 @@
         let players = [];
         let currentPlayer = 0;
         let gameActive = false;
-        let pendingBomb = null; // Memorizza la bomba da reinserire
+        let pendingBomb = null; 
         let turnsToTake = 1;
 
-        // Recupero le vittorie salvate
         let winCount = parseInt(localStorage.getItem('ek_wins')) || 0;
         document.getElementById('wins').innerText = winCount;
 
@@ -219,7 +245,6 @@
             document.getElementById('modal-future').classList.remove('active');
             deck = [];
             
-            // Crea mazzo
             const addCards = (type, count) => { for(let i=0; i<count; i++) deck.push({...type}); };
             addCards(CARD_TYPES.ATTACCO, 4);
             addCards(CARD_TYPES.SALTA, 4);
@@ -228,7 +253,6 @@
             addCards(CARD_TYPES.PREVEDI, 5);
             addCards(CARD_TYPES.FAVORE, 4);
             
-            // Mischia iniziale
             deck.sort(() => Math.random() - 0.5);
 
             players = [
@@ -238,10 +262,8 @@
                 { name: 'Bot Est', hand: [{...CARD_TYPES.DISINNESCO}], isBot: true, alive: true }
             ];
 
-            // 4 carte a testa
             players.forEach(p => { for(let i=0; i<4; i++) p.hand.push(deck.pop()); });
 
-            // Aggiungi bombe
             addCards(CARD_TYPES.BOMBA, 3);
             deck.sort(() => Math.random() - 0.5);
 
@@ -254,7 +276,6 @@
         }
 
         function render() {
-            // Render Mano Giocatore
             const container = document.getElementById('player-hand-container');
             container.innerHTML = '';
             const myHand = players[0].hand;
@@ -279,7 +300,6 @@
                 container.appendChild(wrapper);
             });
 
-            // Render Bot
             for(let i=1; i<=3; i++) {
                 const botHand = document.getElementById(`hand-bot${i}`);
                 const botName = document.getElementById(`name-bot${i}`);
@@ -320,12 +340,10 @@
 
             p.hand.splice(cIdx, 1);
             
-            // Animazione scarto
             document.getElementById('discard-pile').innerHTML = `<div class="card ${card.id}" style="transform: scale(0.9) rotate(${Math.random()*20-10}deg)">
                 <div class="card-title">${card.title}</div><div class="card-icon">${card.icon}</div>
             </div>`;
 
-            // EFFETTI CARTE
             if(card.id === 'mischia') {
                 deck.sort(() => Math.random() - 0.5);
                 notify(`🔀 ${p.name} ha mischiato il mazzo!`);
@@ -335,7 +353,6 @@
             else if(card.id === 'prevedi') {
                 notify(`🔮 ${p.name} scruta il futuro...`);
                 if(pIdx === 0) {
-                    // Prendi le prime 3 (la fine dell'array è la cima del mazzo)
                     let top3 = deck.slice(-3).reverse(); 
                     const fCont = document.getElementById('future-cards');
                     fCont.innerHTML = '';
@@ -374,15 +391,15 @@
             } 
             else if(card.id === 'attacco') {
                 notify(`⚔️ ${p.name} attacca!`);
-                turnsToTake = 0; // Finisce il suo turno
+                turnsToTake = 0; 
                 let nextP = getNextAlivePlayer(pIdx);
                 currentPlayer = nextP;
-                turnsToTake = 2; // Il prossimo ne fa 2
+                turnsToTake = 2; 
                 render();
                 if(players[currentPlayer].isBot) setTimeout(botLogic, 1500);
             }
             else if(card.id === 'nope') {
-                notify(`${p.name} urla NOPE! (Effetto non gestito in questa demo rapida)`);
+                notify(`${p.name} urla NOPE! (Effetto non gestito)`);
                 render();
                 if(pIdx !== 0) setTimeout(botLogic, 1000);
             }
@@ -404,7 +421,6 @@
                         document.getElementById('modal-bomb').classList.add('active');
                     } else {
                         notify(`🛠️ ${p.name} DISINNESCA LA BOMBA e la nasconde...`);
-                        // Il bot posiziona la bomba casualmente
                         setTimeout(() => {
                             let pos = Math.floor(Math.random() * (deck.length + 1));
                             deck.splice(pos, 0, card);
@@ -414,7 +430,6 @@
                 } else {
                     p.alive = false;
                     notify(`💥 ${p.name} È ESPLOSO!`, "danger");
-                    // Rimuovi sue carte
                     p.hand = [];
                     if(pIdx === 0) gameActive = false;
                     
@@ -428,12 +443,11 @@
             }
         }
 
-        // Funzione chiamata dai bottoni del modale umano
         function placeBombHuman(choice) {
             document.getElementById('modal-bomb').classList.remove('active');
             let pos;
-            if(choice === 'top') pos = deck.length; // array fine = cima
-            else if(choice === 'bottom') pos = 0;   // array inizio = fondo
+            if(choice === 'top') pos = deck.length; 
+            else if(choice === 'bottom') pos = 0;   
             else pos = Math.floor(Math.random() * (deck.length + 1));
             
             deck.splice(pos, 0, pendingBomb);
@@ -470,14 +484,11 @@
             if(!gameActive) return;
             const bot = players[currentPlayer];
             
-            // Logica Bot Base: Se il mazzo è grande, gioca carte meno spesso.
             let playChance = deck.length < 10 ? 0.7 : 0.4;
-            
             const playableIdx = bot.hand.findIndex(c => c.id !== 'disinnesco' && c.id !== 'bomba' && c.id !== 'nope');
             
             if(playableIdx > -1 && Math.random() < playChance) {
                 playCard(currentPlayer, playableIdx);
-                // Il bot pesca dopo aver giocato (a meno che non abbia saltato/attaccato)
             } else {
                 drawCard(currentPlayer);
             }
