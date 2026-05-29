@@ -9,5 +9,5 @@ Il gioco include:
 * Interfaccia ottimizzata per desktop e mobile
 * Sistema di vittorie salvate localmente
 
-È collegato alla repository centrale MasterHub (https://mastersabba.github.io/MasterSabba/), piena di altri minigame.
+È collegato alla repository centrale MasterGames (https://mastersabba.github.io/MasterSabba/), piena di altri minigame.
 ![Immagine](IMG_9421.jpeg)
