@@ -10,3 +10,4 @@ Il gioco include:
 * Sistema di vittorie salvate localmente
 
 È collegato alla repository centrale MasterHub (https://mastersabba.github.io/MasterSabba/), piena di altri minigame.
+![Immagine](IMG_9421.jpeg)
