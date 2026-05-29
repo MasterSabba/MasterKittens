@@ -1,3 +1,4 @@
+# MasterKittens
 MasterKittens è un card game strategico ispirato al celebre party game Exploding Kittens. Affronta 3 bot, usa carte speciali e cerca di evitare le bombe esplosive per rimanere l’ultimo sopravvissuto.
 
 Il gioco include:
