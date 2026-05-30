@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Exploding Kittens - Edizione Completa</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght=700;900&display=swap');
 
         :root {
             --table-bg: radial-gradient(circle at center, #1b5e20, #0a3d0a);
@@ -214,7 +214,7 @@
             <h2>🔮 IL FUTURO</h2>
             <p>Ecco le prime 3 carte del mazzo (La prima a sinistra è la cima):</p>
             <div id="future-cards" class="future-cards-container"></div>
-            <button class="btn" onclick="document.getElementById('modal-future').classList.remove('active')">Ho capito</button>
+            <button class="btn" onclick="closeFutureModal()">Ho capito</button>
         </div>
     </div>
 
@@ -236,14 +236,20 @@
         let gameActive = false;
         let pendingBomb = null; 
         let turnsToTake = 1;
+        
+        // Struttura di controllo per la finestra temporale del NOPE
+        let nopeTimeout = null;
+        let activeAction = null;
 
         let winCount = parseInt(localStorage.getItem('ek_wins')) || 0;
         document.getElementById('wins').innerText = winCount;
 
         function initGame() {
+            if(nopeTimeout) clearTimeout(nopeTimeout);
             document.getElementById('modal-bomb').classList.remove('active');
             document.getElementById('modal-future').classList.remove('active');
             deck = [];
+            activeAction = null;
             
             const addCards = (type, count) => { for(let i=0; i<count; i++) deck.push({...type}); };
             addCards(CARD_TYPES.ATTACCO, 4);
@@ -294,7 +300,16 @@
                 const cardEl = document.createElement('div');
                 cardEl.className = `card ${card.id}`;
                 cardEl.innerHTML = `<div class="card-title">${card.title}</div><div class="card-icon">${card.icon}</div><div class="card-desc">${card.desc}</div>`;
-                cardEl.onclick = (e) => { e.stopPropagation(); playCard(0, i); };
+                
+                // Se c'è un'azione bloccabile in corso e hai un NOPE, puoi usarlo istantaneamente fuori dal tuo turno
+                cardEl.onclick = (e) => { 
+                    e.stopPropagation(); 
+                    if(card.id === 'nope' && activeAction && activeAction.pIdx !== 0) {
+                        playNope(0, i);
+                    } else {
+                        playCard(0, i); 
+                    }
+                };
                 
                 wrapper.appendChild(cardEl);
                 container.appendChild(wrapper);
@@ -325,11 +340,12 @@
             document.getElementById('deck-count').innerText = `${deck.length}`;
             
             let status = currentPlayer === 0 ? "Tocca a te!" : `Turno di ${players[currentPlayer].name}`;
+            if(activeAction) status = `In attesa del NOPE su ${players[activeAction.pIdx].name}...`;
             document.getElementById('game-status').innerText = status;
         }
 
         function playCard(pIdx, cIdx) {
-            if(!gameActive || currentPlayer !== pIdx) return;
+            if(!gameActive || currentPlayer !== pIdx || activeAction) return;
             const p = players[pIdx];
             const card = p.hand[cIdx];
 
@@ -339,20 +355,84 @@
             }
 
             p.hand.splice(cIdx, 1);
-            
+            showDiscardPile(card);
+
+            if(card.id === 'nope') {
+                notify(`${p.name} ha sprecato un NOPE senza azioni in corso!`);
+                render();
+                if(pIdx !== 0) setTimeout(botLogic, 1200);
+                return;
+            }
+
+            // Innesca la finestra temporale per permettere la risposta del NOPE
+            activeAction = { pIdx, card, cIdx };
+            notify(`${p.name} gioca ${card.title}. Qualcuno dice NOPE?`);
+            render();
+
+            nopeTimeout = setTimeout(() => {
+                checkBotNopeResponse();
+            }, 2000);
+        }
+
+        function showDiscardPile(card) {
             document.getElementById('discard-pile').innerHTML = `<div class="card ${card.id}" style="transform: scale(0.9) rotate(${Math.random()*20-10}deg)">
                 <div class="card-title">${card.title}</div><div class="card-icon">${card.icon}</div>
             </div>`;
+        }
+
+        // Gestione quando qualcuno gioca un NOPE valido
+        function playNope(nopePlayerIdx, nopeCardIdx) {
+            if(nopeTimeout) clearTimeout(nopeTimeout);
+            
+            const nPlayer = players[nopePlayerIdx];
+            const card = nPlayer.hand.splice(nopeCardIdx, 1)[0];
+            showDiscardPile(card);
+            
+            notify(`🙅‍♂️ ${nPlayer.name} urla NOPE! L'azione di ${players[activeAction.pIdx].name} è ANNULLATA!`);
+            
+            activeAction = null;
+            render();
+
+            // Ripristina il flusso regolare
+            if(players[currentPlayer].isBot) {
+                setTimeout(botLogic, 1500);
+            }
+        }
+
+        // I bot controllano se vogliono e possono annullare la carta giocata
+        function checkBotNopeResponse() {
+            // Se l'azione è del giocatore umano, i bot vivi potrebbero voler giocare un NOPE (50% di chance se lo possiedono)
+            if(activeAction.pIdx === 0) {
+                for (let i = 1; i < players.length; i++) {
+                    if(players[i].alive) {
+                        const nopeIdx = players[i].hand.findIndex(c => c.id === 'nope');
+                        if(nopeIdx > -1 && Math.random() < 0.5) {
+                            playNope(i, nopeIdx);
+                            return;
+                        }
+                    }
+                }
+            } 
+            // Se nessun bot risponde (o l'azione era del bot stesso), l'effetto si risolve
+            executeActiveEffect();
+        }
+
+        function executeActiveEffect() {
+            const action = activeAction;
+            activeAction = null; 
+            const pIdx = action.pIdx;
+            const p = players[pIdx];
+            const card = action.card;
 
             if(card.id === 'mischia') {
                 deck.sort(() => Math.random() - 0.5);
-                notify(`🔀 ${p.name} ha mischiato il mazzo!`);
+                notify(`🔀 Il mazzo è stato mischiato!`);
                 render();
-                if(pIdx !== 0) setTimeout(botLogic, 1500);
+                if(pIdx !== 0) setTimeout(botLogic, 1200);
             } 
             else if(card.id === 'prevedi') {
-                notify(`🔮 ${p.name} scruta il futuro...`);
                 if(pIdx === 0) {
+                    // Cima del mazzo corrisponde agli ultimi elementi dell'array
                     let top3 = deck.slice(-3).reverse(); 
                     const fCont = document.getElementById('future-cards');
                     fCont.innerHTML = '';
@@ -361,8 +441,9 @@
                     });
                     document.getElementById('modal-future').classList.add('active');
                 } else {
+                    notify(`🔮 ${p.name} ha visto il futuro...`);
                     render();
-                    setTimeout(botLogic, 1500);
+                    setTimeout(botLogic, 1200);
                 }
             }
             else if(card.id === 'favore') {
@@ -372,41 +453,44 @@
                     let stolenIdx = Math.floor(Math.random() * target.hand.length);
                     let stolenCard = target.hand.splice(stolenIdx, 1)[0];
                     p.hand.push(stolenCard);
-                    notify(`🎁 ${p.name} ruba una carta a ${target.name}!`);
+                    notify(`🎁 ${p.name} ha rubato una carta a ${target.name}!`);
                 } else {
-                    notify("Nessuno ha carte da darti.");
+                    notify("Nessuno ha carte da dare.");
                 }
                 render();
-                if(pIdx !== 0) setTimeout(botLogic, 1500);
+                if(pIdx !== 0) setTimeout(botLogic, 1200);
             }
             else if(card.id === 'salta') {
-                notify(`⏭️ ${p.name} salta il turno!`);
                 turnsToTake--;
                 if(turnsToTake > 0) {
+                    notify(`⏭️ ${p.name} salta 1 turno obbligatorio!`);
                     render();
                     if(pIdx !== 0) setTimeout(botLogic, 1000);
                 } else {
+                    notify(`⏭️ ${p.name} finisce il suo turno!`);
                     nextTurn();
                 }
             } 
             else if(card.id === 'attacco') {
-                notify(`⚔️ ${p.name} attacca!`);
                 turnsToTake = 0; 
                 let nextP = getNextAlivePlayer(pIdx);
                 currentPlayer = nextP;
                 turnsToTake = 2; 
+                notify(`⚔️ Tocca a ${players[nextP].name} con 2 turni!`);
                 render();
                 if(players[currentPlayer].isBot) setTimeout(botLogic, 1500);
             }
-            else if(card.id === 'nope') {
-                notify(`${p.name} urla NOPE! (Effetto non gestito)`);
-                render();
-                if(pIdx !== 0) setTimeout(botLogic, 1000);
-            }
+        }
+
+        function closeFutureModal() {
+            document.getElementById('modal-future').classList.remove('active');
+            // Prosegui la logica del giocatore dopo aver chiuso il popup del futuro
+            render();
         }
 
         function drawCard(pIdx) {
-            if(!gameActive || currentPlayer !== pIdx) return;
+            // Impedisce di pescare se non è il proprio turno o se c'è un NOPE pendente
+            if(!gameActive || currentPlayer !== pIdx || activeAction) return;
             const p = players[pIdx];
             const card = deck.pop();
             
@@ -481,7 +565,7 @@
         }
 
         function botLogic() {
-            if(!gameActive) return;
+            if(!gameActive || activeAction) return;
             const bot = players[currentPlayer];
             
             let playChance = deck.length < 10 ? 0.7 : 0.4;
@@ -499,7 +583,7 @@
             n.innerText = msg;
             n.style.borderColor = type === 'danger' ? '#e74c3c' : '#f1c40f';
             n.classList.add('show');
-            setTimeout(() => n.classList.remove('show'), 2500);
+            setTimeout(() => n.classList.remove('show'), 2200);
         }
 
         function checkGameOver() {
