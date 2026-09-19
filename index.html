@@ -174,7 +174,7 @@
     <a href="https://mastersabba.github.io/MasterSabba/" class="exit-button" title="Torna all'Hub">×</a>
 
     <div id="stats-bar">
-        <div>🏆 Vittorie: <span id="wins">0</span></div>
+        <div>🏆 Vittorie: <span id="wins">0</span> | 💎 Punti: <span id="pts">0</span></div>
         <div id="game-status">Caricamento...</div>
         <button class="btn" onclick="initGame()">RESET</button>
     </div>
@@ -237,12 +237,15 @@
         let pendingBomb = null; 
         let turnsToTake = 1;
         
-        // Struttura di controllo per la finestra temporale del NOPE
         let nopeTimeout = null;
         let activeAction = null;
+        let hasWon = false;
 
         let winCount = parseInt(localStorage.getItem('ek_wins')) || 0;
         document.getElementById('wins').innerText = winCount;
+        
+        let score = parseInt(localStorage.getItem('points_masterkittens')) || 0;
+        document.getElementById('pts').innerText = score;
 
         function initGame() {
             if(nopeTimeout) clearTimeout(nopeTimeout);
@@ -250,6 +253,7 @@
             document.getElementById('modal-future').classList.remove('active');
             deck = [];
             activeAction = null;
+            hasWon = false;
             
             const addCards = (type, count) => { for(let i=0; i<count; i++) deck.push({...type}); };
             addCards(CARD_TYPES.ATTACCO, 4);
@@ -301,7 +305,6 @@
                 cardEl.className = `card ${card.id}`;
                 cardEl.innerHTML = `<div class="card-title">${card.title}</div><div class="card-icon">${card.icon}</div><div class="card-desc">${card.desc}</div>`;
                 
-                // Se c'è un'azione bloccabile in corso e hai un NOPE, puoi usarlo istantaneamente fuori dal tuo turno
                 cardEl.onclick = (e) => { 
                     e.stopPropagation(); 
                     if(card.id === 'nope' && activeAction && activeAction.pIdx !== 0) {
@@ -364,7 +367,6 @@
                 return;
             }
 
-            // Innesca la finestra temporale per permettere la risposta del NOPE
             activeAction = { pIdx, card, cIdx };
             notify(`${p.name} gioca ${card.title}. Qualcuno dice NOPE?`);
             render();
@@ -380,7 +382,6 @@
             </div>`;
         }
 
-        // Gestione quando qualcuno gioca un NOPE valido
         function playNope(nopePlayerIdx, nopeCardIdx) {
             if(nopeTimeout) clearTimeout(nopeTimeout);
             
@@ -393,15 +394,12 @@
             activeAction = null;
             render();
 
-            // Ripristina il flusso regolare
             if(players[currentPlayer].isBot) {
                 setTimeout(botLogic, 1500);
             }
         }
 
-        // I bot controllano se vogliono e possono annullare la carta giocata
         function checkBotNopeResponse() {
-            // Se l'azione è del giocatore umano, i bot vivi potrebbero voler giocare un NOPE (50% di chance se lo possiedono)
             if(activeAction.pIdx === 0) {
                 for (let i = 1; i < players.length; i++) {
                     if(players[i].alive) {
@@ -413,7 +411,6 @@
                     }
                 }
             } 
-            // Se nessun bot risponde (o l'azione era del bot stesso), l'effetto si risolve
             executeActiveEffect();
         }
 
@@ -432,7 +429,6 @@
             } 
             else if(card.id === 'prevedi') {
                 if(pIdx === 0) {
-                    // Cima del mazzo corrisponde agli ultimi elementi dell'array
                     let top3 = deck.slice(-3).reverse(); 
                     const fCont = document.getElementById('future-cards');
                     fCont.innerHTML = '';
@@ -484,12 +480,10 @@
 
         function closeFutureModal() {
             document.getElementById('modal-future').classList.remove('active');
-            // Prosegui la logica del giocatore dopo aver chiuso il popup del futuro
             render();
         }
 
         function drawCard(pIdx) {
-            // Impedisce di pescare se non è il proprio turno o se c'è un NOPE pendente
             if(!gameActive || currentPlayer !== pIdx || activeAction) return;
             const p = players[pIdx];
             const card = deck.pop();
@@ -594,9 +588,29 @@
                     notify(`💀 HAI PERSO! Il vincitore è ${alive[0].name}`);
                 } else {
                     notify(`🏆 HAI VINTO! COMPLIMENTI!`);
-                    winCount++;
-                    localStorage.setItem('ek_wins', winCount);
-                    document.getElementById('wins').innerText = winCount;
+                    
+                    if (!hasWon) {
+                        hasWon = true;
+                        score += 100;
+                        
+                        // Aggiorna localStorage per il gioco
+                        localStorage.setItem('points_masterkittens', score);
+                        document.getElementById('pts').innerText = score;
+                        
+                        winCount++;
+                        localStorage.setItem("ek_wins", winCount);
+                        document.getElementById('wins').innerText = winCount;
+                        
+                        // Invia i punti all'Hub genitore che ospita l'iframe
+                        const winMsg = {
+                            type: 'GAME_WIN',
+                            gameKey: 'last-spark',
+                            points: 100
+                        };
+                        
+                        if (window.opener) window.opener.postMessage(winMsg, '*');
+                        if (window.parent && window.parent !== window) window.parent.postMessage(winMsg, '*');
+                    }
                 }
             }
             render();
