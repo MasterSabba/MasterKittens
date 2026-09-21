@@ -27,10 +27,27 @@
             position: relative;
         }
 
+        /* Pulsante X senza cerchio */
+        .exit-button {
+            position: fixed;
+            top: 10px;
+            left: 12px;
+            font-size: 2.2rem;
+            line-height: 1;
+            color: var(--text-color);
+            text-decoration: none;
+            z-index: 9999;
+            transition: all 0.2s ease;
+            font-family: Arial, sans-serif;
+            cursor: pointer;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+        }
+        .exit-button:hover { transform: scale(1.15); color: #f1c40f; }
+
         /* Top Bar */
         #stats-bar {
             background: rgba(0,0,0,0.85);
-            padding: 10px 20px;
+            padding: 10px 20px 10px 50px; /* Lascia spazio a sinistra per la X */
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -144,18 +161,6 @@
         .future-cards-container { display: flex; gap: 10px; justify-content: center; margin: 20px 0; }
         .future-cards-container .card { transform: scale(0.9); cursor: default; }
         .future-cards-container .card:hover { transform: scale(0.9); box-shadow: none; }
-
-        /* Adattamento Layout Responsive per la X in alto */
-        @media (max-width: 600px) {
-            #stats-bar { padding-left: 50px; } /* Evita che il testo si sovrapponga alla X */
-        }
-    
-    .exit-button {
-            position: absolute; top: 5px; left:5px; font-size: 2rem; line-height: 1;
-            color: var(--empty-border); text-decoration: none; z-index: 100;
-            transition: all 0.2s ease; -webkit-tap-highlight-color: transparent; font-family: Arial, sans-serif;
-        }
-        .exit-button:hover { color: var(--text-color); transform: scale(1.1); }
     </style>
 </head>
 <body>
@@ -582,7 +587,6 @@
                         hasWon = true;
                         score += 100;
                         
-                        // Aggiorna localStorage per il gioco
                         localStorage.setItem('points_masterkittens', score);
                         document.getElementById('pts').innerText = score;
                         
@@ -590,7 +594,6 @@
                         localStorage.setItem("ek_wins", winCount);
                         document.getElementById('wins').innerText = winCount;
                         
-                        // Invia i punti all'Hub genitore che ospita l'iframe
                         const winMsg = {
                             type: 'GAME_WIN',
                             gameKey: 'last-spark',
